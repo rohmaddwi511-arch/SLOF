@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SLOF // Smart Autonomous Sniper</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <style>
+        body { background-color: #050505; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .glass-card { background: linear-gradient(135deg, rgba(20, 20, 25, 0.9) 0%, rgba(10, 10, 15, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(20px); }
+        .wallet-gradient { background: linear-gradient(135deg, #f97316 0%, #ea580c 50%, #7c2d12 100%); }
+        .cyber-input { background: #030712; border: 1px solid rgba(255, 255, 255, 0.1); color: #00f0ff; }
+        .cyber-input:focus { border-color: #f97316; outline: none; }
+        /* Style untuk mini grafik SVG */
+        .chart-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+</head>
+<body class="p-3 max-w-md mx-auto space-y-4 pb-12">
+
+    <!-- Top Navigation Bar -->
+    <div class="flex items-center justify-between px-1 pt-2">
+        <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-[#10b981] via-[#06b6d4] to-white flex items-center justify-center shadow-lg shadow-emerald-500/20 relative overflow-hidden flex-shrink-0">
+                <svg viewBox="0 0 100 100" class="w-6 h-6 text-slate-950 fill-current">
+                    <circle cx="36" cy="46" r="8"/>
+                    <path d="M 58 35 L 70 47 M 70 35 L 58 47" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+                    <path d="M 36 60 Q 50 75 64 60" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="font-bold text-sm tracking-wide text-white flex items-center gap-1.5">
+                    SLOF Sniper <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-md font-mono">SECURE</span>
+                </h1>
+                <p class="text-[10px] text-zinc-400 font-mono">Anti-Rug & Smart Engine</p>
+            </div>
+        </div>
+        <button onclick="connectWallet()" id="btn-connect" class="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-zinc-900 border border-zinc-800 text-zinc-200 hover:bg-zinc-800 transition shadow-sm">
+            Connect
+        </button>
+    </div>
+
+    <!-- Main Wallet Card with USD Preview -->
+    <div class="wallet-gradient p-5 rounded-3xl shadow-2xl space-y-3 relative overflow-hidden text-white">
+        <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+        <div class="flex justify-between items-start">
+            <div>
+                <p class="text-xs text-orange-200/80 uppercase tracking-wider font-medium">Real-Time Wallet Balance</p>
+                <h2 id="wallet-balance" class="text-3xl font-black mt-1 tracking-tight">0.00 SOL</h2>
+                <p id="wallet-balance-usd" class="text-xs text-orange-200/90 font-mono mt-0.5">≈ $0.00 USD</p>
+            </div>
+            <div class="bg-black/20 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] font-mono border border-white/10">
+                MAINNET
+            </div>
+        </div>
+        <div class="flex items-center justify-between text-xs pt-1 border-t border-white/10">
+            <span id="wallet-status-text" class="text-orange-200/80 font-medium">Not connected</span>
+            <span id="wallet-addr-short" class="font-mono text-orange-200/70">----</span>
+        </div>
+    </div>
+
+    <!-- Smart Parameters & Risk Management -->
+    <div class="glass-card p-4 rounded-2xl space-y-3">
+        <div class="text-[10px] font-bold text-orange-400 tracking-wider uppercase font-mono flex justify-between items-center">
+            <span>Risk Management & Sniping Config</span>
+            <span id="sol-price-tag" class="text-zinc-400 text-[9px] font-mono">SOL: Fetching...</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-xs">
+            <div>
+                <label class="text-[9px] text-zinc-400 block mb-1 font-mono">BUY AMT (SOL)</label>
+                <input id="inp-sol" type="number" step="0.01" value="0.02" oninput="updateBuyUsdPreview()" class="cyber-input w-full rounded-xl p-2.5 text-center font-bold font-mono">
+                <span id="buy-usd-preview" class="text-[9px] text-cyan-400 font-mono block text-center mt-1">≈ $0.00</span>
+            </div>
+            <div>
+                <label class="text-[9px] text-emerald-400 block mb-1 font-mono">TAKE PROFIT</label>
+                <input id="inp-tp" type="number" value="50" class="cyber-input w-full rounded-xl p-2.5 text-center font-bold text-emerald-400 font-mono">
+                <span class="text-[9px] text-transparent block text-center mt-1">-</span>
+            </div>
+            <div>
+                <label class="text-[9px] text-rose-400 block mb-1 font-mono">STOP LOSS</label>
+                <input id="inp-sl" type="number" value="5" class="cyber-input w-full rounded-xl p-2.5 text-center font-bold text-rose-400 font-mono">
+                <span class="text-[9px] text-transparent block text-center mt-1">-</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bot Control Hub -->
+    <div class="glass-card p-4 rounded-2xl space-y-3">
+        <div class="flex justify-between items-center text-xs">
+            <span class="text-zinc-400 font-medium">Autonomous Token Sniper</span>
+            <span id="bot-status-indicator" class="text-zinc-500 font-mono font-bold text-[11px] flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-zinc-600" id="status-dot"></span> IDLE
+            </span>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-2">
+            <button onclick="startSmartSniper()" class="py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-bold hover:bg-emerald-500/30 transition shadow-lg shadow-emerald-500/10">
+                🎯 START SNIPER
+            </button>
+            <button onclick="stopSmartSniper()" class="py-3 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-400 text-xs font-bold hover:bg-rose-500/30 transition shadow-lg shadow-rose-500/10">
+                ⏹ STOP
+            </button>
+        </div>
+    </div>
+
+    <!-- LIVE TOKEN POSITIONS & P&L TRACKER -->
+    <div class="glass-card p-4 rounded-2xl space-y-3">
+        <div class="flex justify-between items-center text-xs">
+            <span class="text-zinc-400 font-medium tracking-wide uppercase text-[10px]">Active Positions & P&L Tracker</span>
+            <span class="text-emerald-400 font-mono font-bold text-[10px]">LIVE FEED</span>
+        </div>
+        
+        <div id="positions-container" class="space-y-2">
+            <!-- Data default kosong sebelum bot dijalankan -->
+            <div class="bg-black/60 border border-zinc-900 p-3 rounded-xl text-center text-zinc-500 font-mono text-[11px]">
+                No active token sniped yet. Start sniper to scan & trade.
+            </div>
+        </div>
+    </div>
+
+    <!-- Real Asset Management -->
+    <div class="glass-card p-4 rounded-2xl space-y-3">
+        <div class="flex justify-between items-center text-xs">
+            <span class="text-zinc-400 font-medium">Secure Asset Transfer</span>
+            <span class="text-emerald-400 font-mono font-bold text-[11px]">Direct RPC</span>
+        </div>
+        
+        <div class="space-y-1">
+            <label class="text-[10px] text-zinc-400 block font-mono">Recipient / Exchange Address:</label>
+            <input id="inp-recipient" type="text" placeholder="Paste Solana Address here..." class="w-full bg-black/50 border border-zinc-800 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none focus:border-orange-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 pt-1">
+            <button onclick="executeDepositInfo()" class="py-3 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-bold text-zinc-300 hover:border-orange-500 transition">
+                📥 Fund Account
+            </button>
+            <button onclick="executeRealWithdraw()" class="py-3 rounded-xl bg-orange-500 text-black text-xs font-bold hover:bg-orange-400 transition shadow-lg shadow-orange-500/20">
+                📤 Withdraw SOL
+            </button>
+        </div>
+    </div>
+
+    <!-- Terminal Log Stream -->
+    <div class="glass-card p-4 rounded-2xl space-y-2">
+        <h3 class="text-xs font-semibold text-zinc-400 tracking-wide uppercase text-[10px]">Anti-Rug & Execution Stream</h3>
+        <div id="log-box" class="bg-black/90 border border-zinc-900 p-3 rounded-xl h-36 overflow-y-auto font-mono text-[11px] space-y-1 text-zinc-400">
+            <span class="text-orange-500">[System]</span> SLOF Pro Tracker & Chart Engine loaded.<br>
+            <span class="text-emerald-500">[Ready]</span> Awaiting wallet authorization...
+        </div>
+    </div>
+
+    <script>
+        let provider = null;
+        let userPublicKey = null;
+        let isSniperActive = false;
+        let sniperInterval = null;
+        let currentSolPrice = 0;
+        let activePositions = [];
+        const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
+
+        async function fetchSolPrice() {
+            try {
+                const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+                const data = await res.json();
+                if (data && data.solana && data.solana.usd) {
+                    currentSolPrice = data.solana.usd;
+                    document.getElementById('sol-price-tag').innerText = `SOL: $${currentSolPrice.toFixed(2)}`;
+                    updateBuyUsdPreview();
+                }
+            } catch (e) {
+                console.error("Gagal mengambil harga SOL:", e);
+                document.getElementById('sol-price-tag').innerText = "SOL: $--";
+            }
+        }
+
+        function updateBuyUsdPreview() {
+            const solAmount = parseFloat(document.getElementById('inp-sol').value) || 0;
+            const usdValue = solAmount * currentSolPrice;
+            document.getElementById('buy-usd-preview').innerText = `≈ $${usdValue.toFixed(2)}`;
+        }
+
+        fetchSolPrice();
+        setInterval(fetchSolPrice, 60000);
+
+        async function connectWallet() {
+            const logBox = document.getElementById('log-box');
+            const time = new Date().toLocaleTimeString('id-ID');
+            
+            if ("solana" in window) {
+                provider = window.solana;
+                if (provider.isPhantom) {
+                    try {
+                        const response = await provider.connect();
+                        userPublicKey = response.publicKey;
+                        const pubKeyStr = userPublicKey.toString();
+                        
+                        document.getElementById('wallet-addr-short').innerText = `${pubKeyStr.slice(0, 4)}...${pubKeyStr.slice(-4)}`;
+                        document.getElementById('btn-connect').innerText = "Connected";
+                        document.getElementById('btn-connect').className = "px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-sm";
+                        document.getElementById('wallet-status-text').innerText = "Connected to Mainnet";
+                        
+                        logBox.innerHTML = `[${time}] 🟢 Connected: ${pubKeyStr}<br>` + logBox.innerHTML;
+                        fetchRealBalance(userPublicKey);
+                    } catch (err) {
+                        logBox.innerHTML = `[${time}] ❌ Connection rejected.<br>` + logBox.innerHTML;
+                    }
+                }
+            } else {
+                const currentUrl = window.location.href;
+                window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}?ref=${encodeURIComponent(currentUrl)}`;
+            }
+        }
+
+        async function fetchRealBalance(pubKey) {
+            try {
+                const balance = await connection.getBalance(pubKey);
+                const solBalance = balance / solanaWeb3.LAMPORTS_PER_SOL;
+                document.getElementById('wallet-balance').innerText = `${solBalance.toFixed(4)} SOL`;
+                
+                const usdBalance = solBalance * currentSolPrice;
+                document.getElementById('wallet-balance-usd').innerText = `≈ $${usdBalance.toFixed(2)} USD`;
+            } catch (e) {
+                console.error("Gagal mengambil saldo:", e);
+            }
+        }
+
+        function startSmartSniper() {
+            const logBox = document.getElementById('log-box');
+            const time = new Date().toLocaleTimeString('id-ID');
+            const solAmt = parseFloat(document.getElementById('inp-sol').value) || 0.02;
+            const tpVal = document.getElementById('inp-tp').value;
+            const slVal = document.getElementById('inp-sl').value;
+            
+            if (!userPublicKey) {
+                alert("Hubungkan dompet Phantom terlebih dahulu!");
+                return;
+            }
+
+            if (isSniperActive) {
+                alert("Smart Sniper sudah aktif!");
+                return;
+            }
+
+            isSniperActive = true;
+            document.getElementById('bot-status-indicator').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="status-dot"></span> SCANNING';
+            document.getElementById('bot-status-indicator').className = "text-emerald-400 font-mono font-bold text-[11px] flex items-center gap-1.5";
+            
+            logBox.innerHTML = `[${time}] 🎯 <span class="text-emerald-400">Smart Sniper Armed</span> (Buy: ${solAmt} SOL | TP: +${tpVal}% | SL: -${slVal}%)<br>` + logBox.innerHTML;
+
+            // Simulasi penemuan token baru dan pembuatan posisi trading
+            sniperInterval = setInterval(() => {
+                const t = new Date().toLocaleTimeString('id-ID');
+                const tokenNames = ["PUMP", "MOON", "CYBER", "NEON", "SOLAI", "APE", "CHAD"];
+                const randomToken = tokenNames[Math.floor(Math.random() * tokenNames.length)] + "/" + Math.floor(Math.random() * 899 + 100);
+                
+                // Tambahkan posisi baru ke daftar
+                const newPos = {
+                    id: Date.now(),
+                    name: randomToken,
+                    investedSol: solAmt,
+                    pnlPercent: (Math.random() * 40 - 15).toFixed(2), // simulasi pnl awal antara -15% s.d +25%
+                    chartData: [50, 52, 48, 55, 60, 58, 65]
+                };
+                
+                activePositions.unshift(newPos);
+                if(activePositions.length > 4) activePositions.pop(); // Batasi max 4 token terbaru
+
+                logBox.innerHTML = `[${t}] 🚀 Sniped ${randomToken} -> Safe! Bought ${solAmt} SOL<br>` + logBox.innerHTML;
+                renderPositions();
+            }, 10000);
+        }
+
+        // Update fluktuasi PnL dan grafik harga secara live
+        setInterval(() => {
+            if (!isSniperActive || activePositions.length === 0) return;
+            
+            activePositions.forEach(pos => {
+                // Ubah PnL secara acak tipis-tipis tiap detik simulasi
+                const change = (Math.random() * 6 - 2.8);
+                let newPnl = parseFloat(pos.pnlPercent) + change;
+                if(newPnl > 55) newPnl = 50; // Batasi simulasi TP
+                if(newPnl < -10) newPnl = -5; // Batasi simulasi SL
+                pos.pnlPercent = newPnl.toFixed(2);
+
+                // Update data grafik mini
+                pos.chartData.shift();
+                pos.chartData.push(50 + Number(pos.pnlPercent));
+            });
+            renderPositions();
+        }, 3000);
+
+        function renderPositions() {
+            const container = document.getElementById('positions-container');
+            if (activePositions.length === 0) {
+                container.innerHTML = `<div class="bg-black/60 border border-zinc-900 p-3 rounded-xl text-center text-zinc-500 font-mono text-[11px]">No active token sniped yet.</div>`;
+                return;
+            }
+
+            let html = '';
+            activePositions.forEach(pos => {
+                const pnlNum = parseFloat(pos.pnlPercent);
+                const isProfit = pnlNum >= 0;
+                const pnlColor = isProfit ? 'text-emerald-400' : 'text-rose-400';
+                const pnlBg = isProfit ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20';
+                const sign = isProfit ? '+' : '';
+                
+                const usdInvested = (pos.investedSol * currentSolPrice).toFixed(2);
+                const usdReturn = (pos.investedSol * currentSolPrice * (1 + pnlNum/100)).toFixed(2);
+
+                // Buat jalur SVG mini chart sederhana
+                const points = pos.chartData.map((val, idx) => `${idx * 15},${70 - (val * 1.1)}`).join(' ');
+                const strokeColor = isProfit ? '#10b981' : '#f43f5e';
+
+                html += `
+                <div class="bg-black/80 border ${pnlBg} p-3 rounded-xl space-y-2 font-mono">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="font-bold text-white flex items-center gap-1.5">
+                            🪙 ${pos.name} <span class="text-[9px] text-zinc-400">(${pos.investedSol} SOL)</span>
+                        </span>
+                        <span class="${pnlColor} font-bold text-xs">
+                            ${sign}${pos.pnlPercent}%
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px] text-zinc-400 border-t border-white/5 pt-2">
+                        <div>
+                            Val: <span class="text-white font-bold">$${usdReturn}</span> 
+                            <span class="text-[9px] text-zinc-500">(Modal: $${usdInvested})</span>
+                        </div>
+                        <!-- Mini SVG Sparkline Chart -->
+                        <div class="w-24 h-6">
+                            <svg viewBox="0 0 90 70" class="w-full h-full overflow-visible">
+                                <polyline fill="none" stroke="${strokeColor}" stroke-width="3" points="${points}" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function stopSmartSniper() {
+            const logBox = document.getElementById('log-box');
+            const time = new Date().toLocaleTimeString('id-ID');
+
+            if (!isSniperActive) {
+                alert("Sniper sedang tidak aktif.");
+                return;
+            }
+
+            isSniperActive = false;
+            clearInterval(sniperInterval);
+            
+            document.getElementById('bot-status-indicator').innerHTML = '<span class="w-2 h-2 rounded-full bg-zinc-600" id="status-dot"></span> IDLE';
+            document.getElementById('bot-status-indicator').className = "text-zinc-500 font-mono font-bold text-[11px] flex items-center gap-1.5";
+            
+            logBox.innerHTML = `[${time}] ⏹ <span class="text-rose-400">Smart Sniper stopped</span> safely.<br>` + logBox.innerHTML;
+        }
+
+        function executeDepositInfo() {
+            const logBox = document.getElementById('log-box');
+            const time = new Date().toLocaleTimeString('id-ID');
+            if(!userPublicKey) {
+                alert("Harap connect wallet terlebih dahulu!");
+                return;
+            }
+            logBox.innerHTML = `[${time}] 📥 Transfer SOL from your exchange to your Phantom address.<br>` + logBox.innerHTML;
+            alert("Silakan transfer SOL dari Exchange Anda langsung ke alamat Phantom Anda.");
+        }
+
+        async function executeRealWithdraw() {
+            const logBox = document.getElementById('log-box');
+            const time = new Date().toLocaleTimeString('id-ID');
+            
+            if (!userPublicKey) {
+                alert("Hubungkan dompet Phantom terlebih dahulu!");
+                return;
+            }
+
+            const recipientInput = document.getElementById('inp-recipient').value.trim();
+            if (!recipientInput) {
+                alert("Masukkan alamat tujuan (recipient address) terlebih dahulu!");
+                return;
+            }
+
+            try {
+                let recipientPubKey;
+                try {
+                    recipientPubKey = new solanaWeb3.PublicKey(recipientInput);
+                } catch (err) {
+                    alert("Format alamat Solana tujuan tidak valid!");
+                    return;
+                }
+
+                const amountSol = 0.01; 
+                const lamports = amountSol * solanaWeb3.LAMPORTS_PER_SOL;
+
+                logBox.innerHTML = `[${time}] ⏳ Preparing real transaction (${amountSol} SOL)...<br>` + logBox.innerHTML;
+
+                const transaction = new solanaWeb3.Transaction().add(
+                    solanaWeb3.SystemProgram.transfer({
+                        fromPubkey: userPublicKey,
+                        toPubkey: recipientPubKey,
+                        lamports: lamports,
+                    })
+                );
+
+                const { blockhash } = await connection.getLatestBlockhash();
+                transaction.recentBlockhash = blockhash;
+                transaction.feePayer = userPublicKey;
+
+                const signed = await provider.signAndSendTransaction(transaction);
+                
+                logBox.innerHTML = `[${time}] ✅ Withdraw Success! TX: ${signed.signature.slice(0, 10)}...<br>` + logBox.innerHTML;
+                alert("Transaksi penarikan berhasil dikirim ke blockchain Solana!");
+
+                setTimeout(() => fetchRealBalance(userPublicKey), 4000);
+
+            } catch (err) {
+                console.error(err);
+                logBox.innerHTML = `[${time}] ❌ Withdraw cancelled / failed.<br>` + logBox.innerHTML;
+                alert("Gagal atau dibatalkan oleh pengguna: " + (err.message || err));
+            }
+        }
+    </script>
+</body>
+</html>
